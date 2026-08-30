@@ -120,8 +120,10 @@ def main():
 
     wandb.init(project="physioshift-baseline", config=CONFIG)
 
+    import numpy as np
+
     x, y = build_smoke_test_data(CONFIG)
-    print(f"Smoke test data shape: {x.shape}, labels shape: {y.shape}")
+    print(f"Smoke test data shape: {x.shape}, labels shape: {y.shape}")  
 
     full_dataset = WindowedSignalDataset(x, y)
     val_size = max(1, int(0.2 * len(full_dataset)))
