@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset, random_split
 from sklearn.metrics import f1_score
+from sklearn.utils.class_weight import compute_class_weight
 import wandb
 
 from src.models.resnet1d import LightweightResNet1D
@@ -120,10 +121,15 @@ def main():
 
     wandb.init(project="physioshift-baseline", config=CONFIG)
 
-    import numpy as np
-
     x, y = build_smoke_test_data(CONFIG)
-    print(f"Smoke test data shape: {x.shape}, labels shape: {y.shape}")  
+    print(f"Smoke test data shape: {x.shape}, labels shape: {y.shape}")
+
+    class_ids = np.unique(y)
+    weights = compute_class_weight(class_weight="balanced", classes=class_ids, y=y)
+    full_weights = np.ones(CONFIG["num_classes"], dtype=np.float32)
+    for cls, w in zip(class_ids, weights):
+        full_weights[cls] = w
+    class_weights = torch.tensor(full_weights, dtype=torch.float32).to(device)
 
     full_dataset = WindowedSignalDataset(x, y)
     val_size = max(1, int(0.2 * len(full_dataset)))
@@ -134,7 +140,7 @@ def main():
     val_loader = DataLoader(val_subset, batch_size=CONFIG["batch_size"], shuffle=False)
 
     model = LightweightResNet1D(num_classes=CONFIG["num_classes"]).to(device)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG["lr"])
 
     best_val_loss = float("inf")
