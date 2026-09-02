@@ -23,6 +23,7 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
+from augmentor import PhysioShiftAugmentor
 from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import f1_score
 
@@ -47,17 +48,24 @@ CONFIG = {
 
 
 class WindowedLabelDataset(Dataset):
-    """Wraps windowed numpy arrays + HR-bucket labels as a PyTorch Dataset."""
+    """Wraps windowed numpy arrays + HR-bucket labels with optional augmentation."""
 
-    def __init__(self, windows: np.ndarray, labels: np.ndarray):
-        self.x = torch.tensor(windows, dtype=torch.float32).unsqueeze(1)  # (N, 1, window_size)
-        self.y = torch.tensor(labels, dtype=torch.long)
+    def __init__(self, windows: np.ndarray, labels: np.ndarray, augmentor=None, fs=100):
+        self.windows = windows.astype(np.float32)
+        self.labels = torch.tensor(labels, dtype=torch.long)
+        self.augmentor = augmentor
+        self.fs = fs
 
     def __len__(self):
-        return len(self.y)
+        return len(self.labels)
 
     def __getitem__(self, idx):
-        return self.x[idx], self.y[idx]
+        sig = self.windows[idx]
+        if self.augmentor is not None:
+            sig, _ = self.augmentor(sig, fs=self.fs)
+        x = torch.tensor(sig, dtype=torch.float32).unsqueeze(0)  # (1, window_size)
+        y = self.labels[idx]
+        return x, y
 
 
 def train_one_epoch(model, loader, optimizer, criterion, device):
@@ -113,8 +121,9 @@ def main(split_name: str):
         print(f"[Split {split_name.upper()}] Not enough labeled windows to train. Skipping.")
         return None
 
-    train_ds = WindowedLabelDataset(train_windows, train_labels)
-    test_ds = WindowedLabelDataset(test_windows, test_labels)
+    augmentor = PhysioShiftAugmentor(p_augment=0.5)
+    train_ds = WindowedLabelDataset(train_windows, train_labels, augmentor=augmentor, fs=TARGET_FS)
+    test_ds = WindowedLabelDataset(test_windows, test_labels, augmentor=None, fs=TARGET_FS)
     train_loader = DataLoader(train_ds, batch_size=CONFIG["batch_size"], shuffle=True)
     test_loader = DataLoader(test_ds, batch_size=CONFIG["batch_size"], shuffle=False)
 
@@ -139,7 +148,6 @@ def main(split_name: str):
     plot_reliability_diagram(
         probs, labels,
         save_path=f"results/reliability_diagrams/split_{split_name}_reliability.png",
-        title=f"Split {split_name.upper()} Reliability Diagram"
     )
 
     return f1, ece
