@@ -106,3 +106,7 @@ All verification code, signal shape checks, sampling rate inspections, and metad
 &#x20; record = wfdb.rdrecord('data/ptb-xl/records100/00000/00001\_lr')
 
 &#x20; signal = record.p\_signal  # Shape: (1000, 12) at 100 Hz
+Clean baseline (26 Aug): F1 = 0.4663, ECE = 0.2292
+Augmented baseline (2 Sep): F1 = 0.4663, ECE = 0.0869
+
+ECE improved significantly from 0.23 to 0.09, showing that data augmentation effectively mitigates baseline overconfidence while keeping Split C macro-F1 steady at 0.47. Augmentation should definitely be carried into the SSL phase.

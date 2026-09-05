@@ -6,3 +6,7 @@ data/*data/
 venv/ 
 .ipynb_checkpoints/ 
 wandb/ 
+data/ 
+*.pt 
+*.npy 
+*.dat 
